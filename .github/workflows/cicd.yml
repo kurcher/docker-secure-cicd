@@ -1,0 +1,77 @@
+name: Build, Scan, and Push Docker Image
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: 'Custom tag for image'
+        required: true
+        default: 'latest'
+
+env:
+  IMAGE_NAME: myapp
+
+jobs:
+  build-and-push:
+    name: Build & Push (Auto)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Registry
+        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:${{ github.sha }} .
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:${{ github.sha }}
+          format: 'table'
+          output: 'trivy-report.txt'
+
+      - name: Upload scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+
+      - name: Push image
+        run: docker push ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:${{ github.sha }}
+
+  manual-build:
+    name: Manual Build & Push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Registry
+        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:${{ github.event.inputs.custom_tag }} .
+
+      - name: Scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:${{ github.event.inputs.custom_tag }}
+          format: 'table'
+          output: 'trivy-report.txt'
+
+      - name: Upload scan report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+
+      - name: Push image
+        run: docker push ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:${{ github.event.inputs.custom_tag }}
+
