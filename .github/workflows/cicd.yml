@@ -11,7 +11,7 @@ on:
         default: 'manual-latest'
 
 env:
-  IMAGE_NAME: myapp341425656756745574745745
+  IMAGE_NAME: myappPPPP
 
 jobs:
 
