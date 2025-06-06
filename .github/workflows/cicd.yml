@@ -39,11 +39,13 @@ jobs:
         format: 'table'
         output: 'trivy-report.txt'
 
-    - name: Upload scan report
-      uses: actions/upload-artifact@v4
-      with:
-        name: trivy-scan-${{ github.run_id }}
-        path: trivy-report.txt
+    - name: Scan image with Trivy
+      run: trivy image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+      env:
+        REGISTRY: ${{ secrets.REGISTRY_URL }}
+        IMAGE_NAME: myapp
+        TAG: ${{ github.sha }}
+
 
     - name: Push Docker image
       run: docker push ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:$TAG
