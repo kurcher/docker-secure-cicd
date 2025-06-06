@@ -1,78 +1,49 @@
-name: Docker CI/CD
+name: CI/CD Docker
 
 on:
   push:
-    branches: [ master ]
-  workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Custom tag for manual image build'
-        required: true
-        default: 'manual-latest'
+    branches:
+      - master
 
 env:
-  IMAGE_NAME: myapp
+  IMAGE_NAME: myapp341 # Замінити на ім’я твого образу
+  REGISTRY_URL: ${{ secrets.REGISTRY_URL }}  # Наприклад: localhost:5000 або ngrok-URL
 
 jobs:
-  auto_build_and_push:
-    if: github.event_name == 'push'
+  build-and-push:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set commit tag
+    - name: Set tag from commit SHA
       run: echo "TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
+    - name: Log in to Docker Registry
+      run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ env.REGISTRY_URL }} -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+
     - name: Build Docker image
-      run: docker build -t ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:$TAG .
+      run: docker build -t ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:${{ env.TAG }} .
 
-    - name: Run Trivy scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:$TAG
-        format: 'table'
-        output: 'trivy-report.txt'
+    - name: Install Trivy
+      run: |
+        sudo apt-get update
+        sudo apt-get install wget -y
+        wget https://github.com/aquasecurity/trivy/releases/download/v0.63.0/trivy_0.63.0_Linux-64bit.deb
+        sudo dpkg -i trivy_0.63.0_Linux-64bit.deb
 
-    - name: Upload Trivy report
+    - name: Scan image with Trivy
+      run: trivy image --format table -o trivy-report.txt ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+
+    - name: Upload Trivy scan report
       uses: actions/upload-artifact@v4
       with:
         name: trivy-report
         path: trivy-report.txt
 
     - name: Push Docker image
-      run: docker push ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:$TAG
+      run: docker push ${{ env.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:${{ env.TAG }}
 
-
-  manual_build_and_push:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set manual tag
-      run: echo "TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
-
-    - name: Build Docker image
-      run: docker build -t ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:$TAG .
-
-    - name: Run Trivy scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:$TAG
-        format: 'table'
-        output: 'trivy-report.txt'
-
-    - name: Upload Trivy report
-      uses: actions/upload-artifact@v4
-      with:
-        name: trivy-report
-        path: trivy-report.txt
-
-    - name: Push Docker image
-      run: docker push ${{ secrets.REGISTRY_URL }}/$IMAGE_NAME:$TAG
 
 
