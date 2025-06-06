@@ -11,7 +11,7 @@ on:
         default: 'manual-latest'
 
 env:
-  IMAGE_NAME: myapp34142565675674557474574574574
+  IMAGE_NAME: myapp341425656756745574745745
 
 jobs:
 
